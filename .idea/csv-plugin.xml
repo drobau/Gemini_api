@@ -17,6 +17,27 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="\tests\test_btcusd_sell_functional.py">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\tests\test_ethusd_buy_functional.py">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\tests\test_ethusd_sell_functional.py">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\tests\test_f.py">
           <value>
             <Attribute>
@@ -25,6 +46,20 @@
           </value>
         </entry>
         <entry key="\tests\test_post_new_order.py">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\tests\tests_zecusd_buy_functional.py">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\tests\tests_zecusd_sell_functional.py">
           <value>
             <Attribute>
               <option name="separator" value="," />

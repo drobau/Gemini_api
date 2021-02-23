@@ -1,13 +1,11 @@
 import pytest
 from utils.api_post import post_request
 from utils.build_payload import Payload
+from utils.actual_prices import Prices
 import time
 
 
-class TestsTech:
-    # current_price_BTCUSD is an actual price for moment of execution. Ideally I would to use GET request and
-    # pull it automatically, but requirements is: "Do not invoke any other API endpoints"
-    current_price_BTCUSD = 50776.00
+class TestsBtcUsdBuy:
 
     @pytest.fixture(autouse=True)
     def sleep1(self):
@@ -16,7 +14,7 @@ class TestsTech:
     @staticmethod
     def test_maker_or_cancel_fulfill():
         amount = "0.001"
-        price = str('{0:.2f}'.format(TestsTech.current_price_BTCUSD - 10000))
+        price = str('{0:.2f}'.format(Prices.current_price_BTCUSD - 10000))
         options = ["maker-or-cancel"]
         payload = Payload.create_limit_payload_buy("btcusd", amount, price, options)
 
@@ -41,7 +39,7 @@ class TestsTech:
     @staticmethod
     def test_maker_or_cancel_cancel():
         amount = "0.001"
-        price = str('{0:.2f}'.format(TestsTech.current_price_BTCUSD + 10000))
+        price = str('{0:.2f}'.format(Prices.current_price_BTCUSD + 10000))
         options = ["maker-or-cancel"]
         payload = Payload.create_limit_payload_buy("btcusd", amount, price, options)
 
@@ -64,35 +62,35 @@ class TestsTech:
         assert response_json['original_amount'] == amount
         assert response_json['remaining_amount'] == amount
 
-    @staticmethod  # TODO always cancel-true. reason: SelfCrossPrevented
+    @staticmethod
     def test_immediate_or_cancel_fulfill():
         amount = "0.001"
-        price = str('{0:.2f}'.format(TestsTech.current_price_BTCUSD + 10000))
+        price = str('{0:.2f}'.format(Prices.current_price_BTCUSD + 10000))
         options = ["immediate-or-cancel"]
 
         payload = Payload.create_limit_payload_buy("btcusd", amount, price, options)
         response = post_request(payload)
         response_json = response.json()
-        print(response_json)
+
         assert response.status_code == 200
         assert response_json['symbol'] == "btcusd"
         assert response_json['exchange'] == 'gemini'
         assert response_json['side'] == "buy"
         assert response_json['type'] == 'exchange limit'
-        assert response_json['is_live']
+        assert not response_json['is_live']
         assert not response_json['is_cancelled']
         assert not response_json['is_hidden']
         assert not response_json['was_forced']
-        assert response_json['executed_amount'] == '0'
+        assert response_json['executed_amount'] == amount
         assert response_json['options'] == options
         assert response_json['price'] == price
         assert response_json['original_amount'] == amount
-        assert response_json['remaining_amount'] == amount
+        assert response_json['remaining_amount'] == '0'
 
     @staticmethod
     def test_immediate_or_cancel_cancel():
         amount = "4"
-        price = str('{0:.2f}'.format(TestsTech.current_price_BTCUSD - 10000))
+        price = str('{0:.2f}'.format(Prices.current_price_BTCUSD - 10000))
         options = ["immediate-or-cancel"]
 
         payload = Payload.create_limit_payload_buy("btcusd", amount, price, options)
@@ -117,7 +115,7 @@ class TestsTech:
     @staticmethod
     def test_fill_or_kill_fulfill():
         amount = "0.001"
-        price = str('{0:.2f}'.format(TestsTech.current_price_BTCUSD - 1000))
+        price = str('{0:.2f}'.format(Prices.current_price_BTCUSD - 1000))
         options = ["maker-or-cancel"]
 
         payload = Payload.create_limit_payload_buy("btcusd", amount, price, options)
@@ -142,7 +140,7 @@ class TestsTech:
     @staticmethod
     def test_fill_or_kill_cancel():
         amount = "2"
-        price = str('{0:.2f}'.format(TestsTech.current_price_BTCUSD + 10000))
+        price = str('{0:.2f}'.format(Prices.current_price_BTCUSD + 10000))
         options = ["maker-or-cancel"]
 
         payload = Payload.create_limit_payload_buy("btcusd", amount, price, options)
@@ -171,7 +169,7 @@ class TestsTech:
     @staticmethod
     def test_auction_only():
         amount = "1"
-        price = str('{0:.2f}'.format(TestsTech.current_price_BTCUSD))
+        price = str('{0:.2f}'.format(Prices.current_price_BTCUSD))
         options = ["auction-only"]
         payload = Payload.create_limit_payload_buy("btcusd", amount, price, options)
 
@@ -185,54 +183,9 @@ class TestsTech:
                                            "auction open for BTCUSD"
 
     @staticmethod
-    def test_indication_of_interest_invalid_quantity():
-        amount = "4"
-        price = str('{0:.2f}'.format(TestsTech.current_price_BTCUSD + 2500))
-        options = ["indication-of-interest"]
-        payload = Payload.create_limit_payload_buy("btcusd", amount, price, options)
-
-        response = post_request(payload)
-        response_json = response.json()
-        print(response_json)
-        assert response.status_code == 400
-        assert response_json['result'] == 'error'
-        assert response_json['reason'] == 'InvalidQuantity'
-        assert response_json['message'] == f'Invalid quantity for symbol BTCUSD: {amount}'
-
-    @staticmethod
-    def test_indication_of_interest_negative():
-        amount = "5"
-        price = str('{0:.2f}'.format(TestsTech.current_price_BTCUSD + 2500))
-        options = ["indication-of-interest"]
-        payload = Payload.create_limit_payload_buy("btcusd", amount, price, options)
-
-        response = post_request(payload)
-        response_json = response.json()
-        print(response_json)
-        assert response.status_code == 400
-        assert response_json['result'] == 'error'
-        assert response_json['reason'] == 'InvalidPrice'
-        assert response_json['message'] == f'Invalid price for symbol BTCUSD: {price}'
-
-    @staticmethod
-    def test_indication_of_interest_negative():
-        amount = "5"
-        price = str('{0:.2f}'.format(TestsTech.current_price_BTCUSD + 2500))
-        options = ["indication-of-interest"]
-        payload = Payload.create_limit_payload_buy("btcusd", amount, price, options)
-
-        response = post_request(payload)
-        response_json = response.json()
-        print(response_json)
-        assert response.status_code == 400
-        assert response_json['result'] == 'error'
-        assert response_json['reason'] == 'InvalidPrice'
-        assert response_json['message'] == f'Invalid price for symbol BTCUSD: {price}'
-
-    @staticmethod
     def test_indication_of_interest_fulfill():
         amount = "5"
-        price = str('{0:.2f}'.format(TestsTech.current_price_BTCUSD + 50))
+        price = str('{0:.2f}'.format(Prices.current_price_BTCUSD + 500))
         options = ["indication-of-interest"]
         payload = Payload.create_limit_payload_buy("btcusd", amount, price, options)
 
@@ -254,10 +207,40 @@ class TestsTech:
         assert response_json['remaining_amount'] == amount
 
     @staticmethod
-    def test_stop_limit_orders():
+    def test_indication_of_interest_invalid_quantity():
+        amount = "4"
+        price = str('{0:.2f}'.format(Prices.current_price_BTCUSD + 2500))
+        options = ["indication-of-interest"]
+        payload = Payload.create_limit_payload_buy("btcusd", amount, price, options)
+
+        response = post_request(payload)
+        response_json = response.json()
+        print(response_json)
+        assert response.status_code == 400
+        assert response_json['result'] == 'error'
+        assert response_json['reason'] == 'InvalidQuantity'
+        assert response_json['message'] == f'Invalid quantity for symbol BTCUSD: {amount}'
+
+    @staticmethod
+    def test_indication_of_invalid_price():
+        amount = "5"
+        price = str('{0:.2f}'.format(Prices.current_price_BTCUSD - 2500))
+        options = ["indication-of-interest"]
+        payload = Payload.create_limit_payload_buy("btcusd", amount, price, options)
+
+        response = post_request(payload)
+        response_json = response.json()
+        print(response_json)
+        assert response.status_code == 400
+        assert response_json['result'] == 'error'
+        assert response_json['reason'] == 'InvalidPrice'
+        assert response_json['message'] == f'Invalid price for symbol BTCUSD: {price}'
+
+    @staticmethod
+    def test_stop_limit_order():
         amount = "0.1"
-        price = str('{0:.2f}'.format(TestsTech.current_price_BTCUSD - 100))
-        stop_price = str('{0:.2f}'.format(TestsTech.current_price_BTCUSD - 120))
+        price = str('{0:.2f}'.format(Prices.current_price_BTCUSD + 130))
+        stop_price = str('{0:.2f}'.format(Prices.current_price_BTCUSD + 120))
         payload = Payload.create_stop_limit_payload_buy("btcusd", amount, price, stop_price)
 
         response = post_request(payload)
@@ -274,13 +257,14 @@ class TestsTech:
         assert response_json['executed_amount'] == '0'
         assert response_json['options'] == []
         assert response_json['price'] == price
+        assert response_json['stop_price'] == stop_price
         assert response_json['original_amount'] == amount
 
     @staticmethod
-    def test_negative_stop_limit_orders():
+    def test_negative_stop_limit_order():
         amount = "0.1"
-        price = str('{0:.2f}'.format(TestsTech.current_price_BTCUSD - 1000))
-        stop_price = str('{0:.2f}'.format(TestsTech.current_price_BTCUSD))
+        price = str('{0:.2f}'.format(Prices.current_price_BTCUSD - 1000))
+        stop_price = str('{0:.2f}'.format(Prices.current_price_BTCUSD))
         payload = Payload.create_stop_limit_payload_buy("btcusd", amount, price, stop_price)
 
         response = post_request(payload)
