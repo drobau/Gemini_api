@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>Test Report</title>
+    <link href="assets/style.css" rel="stylesheet" type="text/css"/></head>
+  <body onLoad="init()">
+    <script>/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+
+function toArray(iter) {
+    if (iter === null) {
+        return null;
+    }
+    return Array.prototype.slice.call(iter);
+}
+
+function find(selector, elem) { // eslint-disable-line no-redeclare
+    if (!elem) {
+        elem = document;
+    }
+    return elem.querySelector(selector);
+}
+
+function findAll(selector, elem) {
+    if (!elem) {
+        elem = document;
+    }
+    return toArray(elem.querySelectorAll(selector));
+}
+
+function sortColumn(elem) {
+    toggleSortStates(elem);
+    const colIndex = toArray(elem.parentNode.childNodes).indexOf(elem);
+    let key;
+    if (elem.classList.contains('result')) {
+        key = keyResult;
+    } else if (elem.classList.contains('links')) {
+        key = keyLink;
+    } else {
+        key = keyAlpha;
+    }
+    sortTable(elem, key(colIndex));
+}
+
+function showAllExtras() { // eslint-disable-line no-unused-vars
+    findAll('.col-result').forEach(showExtras);
+}
+
+function hideAllExtras() { // eslint-disable-line no-unused-vars
+    findAll('.col-result').forEach(hideExtras);
+}
+
+function showExtras(colresultElem) {
+    const extras = colresultElem.parentNode.nextElementSibling;
+    const expandcollapse = colresultElem.firstElementChild;
+    extras.classList.remove('collapsed');
+    expandcollapse.classList.remove('expander');
+    expandcollapse.classList.add('collapser');
+}
+
+function hideExtras(colresultElem) {
+    const extras = colresultElem.parentNode.nextElementSibling;
+    const expandcollapse = colresultElem.firstElementChild;
+    extras.classList.add('collapsed');
+    expandcollapse.classList.remove('collapser');
+    expandcollapse.classList.add('expander');
+}
+
+function showFilters() {
+    const filterItems = document.getElementsByClassName('filter');
+    for (let i = 0; i < filterItems.length; i++)
+        filterItems[i].hidden = false;
+}
+
+function addCollapse() {
+    // Add links for show/hide all
+    const resulttable = find('table#results-table');
+    const showhideall = document.createElement('p');
+    showhideall.innerHTML = '<a href="javascript:showAllExtras()">Show all details</a> / ' +
+                            '<a href="javascript:hideAllExtras()">Hide all details</a>';
+    resulttable.parentElement.insertBefore(showhideall, resulttable);
+
+    // Add show/hide link to each result
+    findAll('.col-result').forEach(function(elem) {
+        const collapsed = getQueryParameter('collapsed') || 'Passed';
+        const extras = elem.parentNode.nextElementSibling;
+        const expandcollapse = document.createElement('span');
+        if (extras.classList.contains('collapsed')) {
+            expandcollapse.classList.add('expander');
+        } else if (collapsed.includes(elem.innerHTML)) {
+            extras.classList.add('collapsed');
+            expandcollapse.classList.add('expander');
+        } else {
+            expandcollapse.classList.add('collapser');
+        }
+        elem.appendChild(expandcollapse);
+
+        elem.addEventListener('click', function(event) {
+            if (event.currentTarget.parentNode.nextElementSibling.classList.contains('collapsed')) {
+                showExtras(event.currentTarget);
+            } else {
+                hideExtras(event.currentTarget);
+            }
+        });
+    });
+}
+
+function getQueryParameter(name) {
+    const match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+    return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+}
+
+function init () { // eslint-disable-line no-unused-vars
+    resetSortHeaders();
+
+    addCollapse();
+
+    showFilters();
+
+    sortColumn(find('.initial-sort'));
+
+    findAll('.sortable').forEach(function(elem) {
+        elem.addEventListener('click',
+            function() {
+                sortColumn(elem);
+            }, false);
+    });
+}
+
+function sortTable(clicked, keyFunc) {
+    const rows = findAll('.results-table-row');
+    const reversed = !clicked.classList.contains('asc');
+    const sortedRows = sort(rows, keyFunc, reversed);
+    /* Whole table is removed here because browsers acts much slower
+     * when appending existing elements.
+     */
+    const thead = document.getElementById('results-table-head');
+    document.getElementById('results-table').remove();
+    const parent = document.createElement('table');
+    parent.id = 'results-table';
+    parent.appendChild(thead);
+    sortedRows.forEach(function(elem) {
+        parent.appendChild(elem);
+    });
+    document.getElementsByTagName('BODY')[0].appendChild(parent);
+}
+
+function sort(items, keyFunc, reversed) {
+    const sortArray = items.map(function(item, i) {
+        return [keyFunc(item), i];
+    });
+
+    sortArray.sort(function(a, b) {
+        const keyA = a[0];
+        const keyB = b[0];
+
+        if (keyA == keyB) return 0;
+
+        if (reversed) {
+            return keyA < keyB ? 1 : -1;
+        } else {
+            return keyA > keyB ? 1 : -1;
+        }
+    });
+
+    return sortArray.map(function(item) {
+        const index = item[1];
+        return items[index];
+    });
+}
+
+function keyAlpha(colIndex) {
+    return function(elem) {
+        return elem.childNodes[1].childNodes[colIndex].firstChild.data.toLowerCase();
+    };
+}
+
+function keyLink(colIndex) {
+    return function(elem) {
+        const dataCell = elem.childNodes[1].childNodes[colIndex].firstChild;
+        return dataCell == null ? '' : dataCell.innerText.toLowerCase();
+    };
+}
+
+function keyResult(colIndex) {
+    return function(elem) {
+        const strings = ['Error', 'Failed', 'Rerun', 'XFailed', 'XPassed',
+            'Skipped', 'Passed'];
+        return strings.indexOf(elem.childNodes[1].childNodes[colIndex].firstChild.data);
+    };
+}
+
+function resetSortHeaders() {
+    findAll('.sort-icon').forEach(function(elem) {
+        elem.parentNode.removeChild(elem);
+    });
+    findAll('.sortable').forEach(function(elem) {
+        const icon = document.createElement('div');
+        icon.className = 'sort-icon';
+        icon.textContent = 'vvv';
+        elem.insertBefore(icon, elem.firstChild);
+        elem.classList.remove('desc', 'active');
+        elem.classList.add('asc', 'inactive');
+    });
+}
+
+function toggleSortStates(elem) {
+    //if active, toggle between asc and desc
+    if (elem.classList.contains('active')) {
+        elem.classList.toggle('asc');
+        elem.classList.toggle('desc');
+    }
+
+    //if inactive, reset all other functions and add ascending active
+    if (elem.classList.contains('inactive')) {
+        resetSortHeaders();
+        elem.classList.remove('inactive');
+        elem.classList.add('active');
+    }
+}
+
+function isAllRowsHidden(value) {
+    return value.hidden == false;
+}
+
+function filterTable(elem) { // eslint-disable-line no-unused-vars
+    const outcomeAtt = 'data-test-result';
+    const outcome = elem.getAttribute(outcomeAtt);
+    const classOutcome = outcome + ' results-table-row';
+    const outcomeRows = document.getElementsByClassName(classOutcome);
+
+    for(let i = 0; i < outcomeRows.length; i++){
+        outcomeRows[i].hidden = !elem.checked;
+    }
+
+    const rows = findAll('.results-table-row').filter(isAllRowsHidden);
+    const allRowsHidden = rows.length == 0 ? true : false;
+    const notFoundMessage = document.getElementById('not-found-message');
+    notFoundMessage.hidden = !allRowsHidden;
+}
+</script>
+    <h1>pytest_report.html</h1>
+    <p>Report generated on 22-Feb-2021 at 19:36:10 by <a href="https://pypi.python.org/pypi/pytest-html">pytest-html</a> v3.1.1</p>
+    <h2>Environment</h2>
+    <table id="environment">
+      <tr>
+        <td>JAVA_HOME</td>
+        <td>C:\Program Files\Java\jdk1.8.0_221</td></tr>
+      <tr>
+        <td>Packages</td>
+        <td>{"pluggy": "0.13.1", "py": "1.10.0", "pytest": "6.2.2"}</td></tr>
+      <tr>
+        <td>Platform</td>
+        <td>Windows-10-10.0.18362-SP0</td></tr>
+      <tr>
+        <td>Plugins</td>
+        <td>{"html": "3.1.1", "metadata": "1.11.0"}</td></tr>
+      <tr>
+        <td>Python</td>
+        <td>3.8.7</td></tr></table>
+    <h2>Summary</h2>
+    <p>87 tests ran in 121.21 seconds. </p>
+    <p class="filter" hidden="true">(Un)check the boxes to filter the results.</p><input checked="true" class="filter" data-test-result="passed" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="passed">87 passed</span>, <input checked="true" class="filter" data-test-result="skipped" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="skipped">0 skipped</span>, <input checked="true" class="filter" data-test-result="failed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="failed">0 failed</span>, <input checked="true" class="filter" data-test-result="error" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="error">0 errors</span>, <input checked="true" class="filter" data-test-result="xfailed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="xfailed">0 expected failures</span>, <input checked="true" class="filter" data-test-result="xpassed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="xpassed">0 unexpected passes</span>
+    <h2>Results</h2>
+    <table id="results-table">
+      <thead id="results-table-head">
+        <tr>
+          <th class="sortable result initial-sort" col="result">Result</th>
+          <th class="sortable" col="name">Test</th>
+          <th class="sortable" col="duration">Duration</th>
+          <th class="sortable links" col="links">Links</th></tr>
+        <tr hidden="true" id="not-found-message">
+          <th colspan="4">No results found. Try to check the filters</th></tr></thead>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_btcusd_buy_functional.py::TestsBtcUsdBuy::test_maker_or_cancel_fulfill</td>
+          <td class="col-duration">1.28</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_btcusd_buy_functional.py::TestsBtcUsdBuy::test_maker_or_cancel_cancel</td>
+          <td class="col-duration">1.19</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_btcusd_buy_functional.py::TestsBtcUsdBuy::test_immediate_or_cancel_fulfill</td>
+          <td class="col-duration">1.19</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_btcusd_buy_functional.py::TestsBtcUsdBuy::test_immediate_or_cancel_cancel</td>
+          <td class="col-duration">1.20</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_btcusd_buy_functional.py::TestsBtcUsdBuy::test_fill_or_kill_fulfill</td>
+          <td class="col-duration">1.23</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_btcusd_buy_functional.py::TestsBtcUsdBuy::test_fill_or_kill_cancel</td>
+          <td class="col-duration">1.22</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_btcusd_buy_functional.py::TestsBtcUsdBuy::test_auction_only</td>
+          <td class="col-duration">1.20</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_btcusd_buy_functional.py::TestsBtcUsdBuy::test_indication_of_interest_fulfill</td>
+          <td class="col-duration">1.24</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_btcusd_buy_functional.py::TestsBtcUsdBuy::test_indication_of_interest_invalid_quantity</td>
+          <td class="col-duration">1.20</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;result&#x27;: &#x27;error&#x27;, &#x27;reason&#x27;: &#x27;InvalidQuantity&#x27;, &#x27;message&#x27;: &#x27;Invalid quantity for symbol BTCUSD: 4&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_btcusd_buy_functional.py::TestsBtcUsdBuy::test_indication_of_invalid_price</td>
+          <td class="col-duration">1.21</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;result&#x27;: &#x27;error&#x27;, &#x27;reason&#x27;: &#x27;InvalidPrice&#x27;, &#x27;message&#x27;: &#x27;Invalid price for symbol BTCUSD: 51884.00&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_btcusd_buy_functional.py::TestsBtcUsdBuy::test_stop_limit_order</td>
+          <td class="col-duration">1.23</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_btcusd_buy_functional.py::TestsBtcUsdBuy::test_negative_stop_limit_order</td>
+          <td class="col-duration">1.18</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>400
+{&#x27;result&#x27;: &#x27;error&#x27;, &#x27;reason&#x27;: &#x27;InvalidStopPriceBuy&#x27;, &#x27;message&#x27;: &#x27;Stop Price: $54,384.00 must be lower than Price: $53,384.00 for Stop Limit buy Orders&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_btcusd_sell_functional.py::TestsBtcUsdSell::test_maker_or_cancel_fulfill</td>
+          <td class="col-duration">1.21</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_btcusd_sell_functional.py::TestsBtcUsdSell::test_maker_or_cancel_cancel</td>
+          <td class="col-duration">1.21</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_btcusd_sell_functional.py::TestsBtcUsdSell::test_immediate_or_cancel_fulfill</td>
+          <td class="col-duration">1.20</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;order_id&#x27;: &#x27;730477254&#x27;, &#x27;id&#x27;: &#x27;730477254&#x27;, &#x27;symbol&#x27;: &#x27;btcusd&#x27;, &#x27;exchange&#x27;: &#x27;gemini&#x27;, &#x27;avg_execution_price&#x27;: &#x27;54384.24&#x27;, &#x27;side&#x27;: &#x27;sell&#x27;, &#x27;type&#x27;: &#x27;exchange limit&#x27;, &#x27;timestamp&#x27;: &#x27;1614044069&#x27;, &#x27;timestampms&#x27;: 1614044069300, &#x27;is_live&#x27;: False, &#x27;is_cancelled&#x27;: False, &#x27;is_hidden&#x27;: False, &#x27;was_forced&#x27;: False, &#x27;executed_amount&#x27;: &#x27;0.0001&#x27;, &#x27;options&#x27;: [&#x27;immediate-or-cancel&#x27;], &#x27;price&#x27;: &#x27;53384.00&#x27;, &#x27;original_amount&#x27;: &#x27;0.0001&#x27;, &#x27;remaining_amount&#x27;: &#x27;0&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_btcusd_sell_functional.py::TestsBtcUsdSell::test_immediate_or_cancel_cancel</td>
+          <td class="col-duration">1.20</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_btcusd_sell_functional.py::TestsBtcUsdSell::test_fill_or_kill_fulfill</td>
+          <td class="col-duration">1.43</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_btcusd_sell_functional.py::TestsBtcUsdSell::test_fill_or_kill_cancel</td>
+          <td class="col-duration">1.23</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_btcusd_sell_functional.py::TestsBtcUsdSell::test_auction_only</td>
+          <td class="col-duration">2.60</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_btcusd_sell_functional.py::TestsBtcUsdSell::test_indication_of_interest_fulfill</td>
+          <td class="col-duration">1.22</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;order_id&#x27;: &#x27;730477521&#x27;, &#x27;id&#x27;: &#x27;730477521&#x27;, &#x27;symbol&#x27;: &#x27;btcusd&#x27;, &#x27;exchange&#x27;: &#x27;gemini&#x27;, &#x27;avg_execution_price&#x27;: &#x27;0.00&#x27;, &#x27;side&#x27;: &#x27;sell&#x27;, &#x27;type&#x27;: &#x27;indication-of-interest limit&#x27;, &#x27;timestamp&#x27;: &#x27;1614044076&#x27;, &#x27;timestampms&#x27;: 1614044076988, &#x27;is_live&#x27;: True, &#x27;is_cancelled&#x27;: False, &#x27;is_hidden&#x27;: True, &#x27;was_forced&#x27;: False, &#x27;executed_amount&#x27;: &#x27;0&#x27;, &#x27;options&#x27;: [&#x27;indication-of-interest&#x27;], &#x27;price&#x27;: &#x27;54084.00&#x27;, &#x27;original_amount&#x27;: &#x27;5&#x27;, &#x27;remaining_amount&#x27;: &#x27;5&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_btcusd_sell_functional.py::TestsBtcUsdSell::test_indication_of_interest_invalid_quantity</td>
+          <td class="col-duration">1.20</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;result&#x27;: &#x27;error&#x27;, &#x27;reason&#x27;: &#x27;InvalidQuantity&#x27;, &#x27;message&#x27;: &#x27;Invalid quantity for symbol BTCUSD: 4&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_btcusd_sell_functional.py::TestsBtcUsdSell::test_indication_of_interest_invalid_price</td>
+          <td class="col-duration">1.24</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;result&#x27;: &#x27;error&#x27;, &#x27;reason&#x27;: &#x27;InvalidPrice&#x27;, &#x27;message&#x27;: &#x27;Invalid price for symbol BTCUSD: 56884.00&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_btcusd_sell_functional.py::TestsBtcUsdSell::test_stop_limit_order</td>
+          <td class="col-duration">1.19</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>200
+{&#x27;order_id&#x27;: &#x27;730477534&#x27;, &#x27;id&#x27;: &#x27;730477534&#x27;, &#x27;symbol&#x27;: &#x27;btcusd&#x27;, &#x27;exchange&#x27;: &#x27;gemini&#x27;, &#x27;avg_execution_price&#x27;: &#x27;0.00&#x27;, &#x27;side&#x27;: &#x27;sell&#x27;, &#x27;type&#x27;: &#x27;stop-limit&#x27;, &#x27;timestamp&#x27;: &#x27;1614044080&#x27;, &#x27;timestampms&#x27;: 1614044080670, &#x27;is_live&#x27;: True, &#x27;is_cancelled&#x27;: False, &#x27;is_hidden&#x27;: False, &#x27;was_forced&#x27;: False, &#x27;executed_amount&#x27;: &#x27;0&#x27;, &#x27;options&#x27;: [], &#x27;stop_price&#x27;: &#x27;54264.00&#x27;, &#x27;price&#x27;: &#x27;54254.00&#x27;, &#x27;original_amount&#x27;: &#x27;0.1&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_btcusd_sell_functional.py::TestsBtcUsdSell::test_negative_stop_limit_order</td>
+          <td class="col-duration">1.21</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_ethusd_buy_functional.py::TestsEthUsdBuy::test_maker_or_cancel_fulfill</td>
+          <td class="col-duration">1.18</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_ethusd_buy_functional.py::TestsEthUsdBuy::test_maker_or_cancel_cancel</td>
+          <td class="col-duration">1.18</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_ethusd_buy_functional.py::TestsEthUsdBuy::test_immediate_or_cancel_fulfill</td>
+          <td class="col-duration">1.18</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_ethusd_buy_functional.py::TestsEthUsdBuy::test_immediate_or_cancel_cancel</td>
+          <td class="col-duration">1.20</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_ethusd_buy_functional.py::TestsEthUsdBuy::test_fill_or_kill_fulfill</td>
+          <td class="col-duration">1.21</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_ethusd_buy_functional.py::TestsEthUsdBuy::test_fill_or_kill_cancel</td>
+          <td class="col-duration">1.19</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_ethusd_buy_functional.py::TestsEthUsdBuy::test_auction_only</td>
+          <td class="col-duration">5.89</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_ethusd_buy_functional.py::TestsEthUsdBuy::test_indication_of_interest_fulfill</td>
+          <td class="col-duration">1.30</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_ethusd_buy_functional.py::TestsEthUsdBuy::test_indication_of_interest_invalid_quantity</td>
+          <td class="col-duration">1.17</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;result&#x27;: &#x27;error&#x27;, &#x27;reason&#x27;: &#x27;InvalidQuantity&#x27;, &#x27;message&#x27;: &#x27;Invalid quantity for symbol ETHUSD: 4&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_ethusd_buy_functional.py::TestsEthUsdBuy::test_indication_of_invalid_price</td>
+          <td class="col-duration">1.18</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;result&#x27;: &#x27;error&#x27;, &#x27;reason&#x27;: &#x27;InvalidPrice&#x27;, &#x27;message&#x27;: &#x27;Invalid price for symbol ETHUSD: -721.36&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_ethusd_buy_functional.py::TestsEthUsdBuy::test_stop_limit_order</td>
+          <td class="col-duration">1.19</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_ethusd_buy_functional.py::TestsEthUsdBuy::test_negative_stop_limit_order</td>
+          <td class="col-duration">1.20</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>400
+{&#x27;result&#x27;: &#x27;error&#x27;, &#x27;reason&#x27;: &#x27;InvalidStopPriceBuy&#x27;, &#x27;message&#x27;: &#x27;Stop Price: $1,778.64 must be lower than Price: $1,678.64 for Stop Limit buy Orders&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_ethusd_sell_functional.py::TestsEthUsdSell::test_maker_or_cancel_fulfill</td>
+          <td class="col-duration">1.23</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_ethusd_sell_functional.py::TestsEthUsdSell::test_maker_or_cancel_cancel</td>
+          <td class="col-duration">1.20</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_ethusd_sell_functional.py::TestsEthUsdSell::test_immediate_or_cancel_fulfill</td>
+          <td class="col-duration">1.18</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;order_id&#x27;: &#x27;730477668&#x27;, &#x27;id&#x27;: &#x27;730477668&#x27;, &#x27;symbol&#x27;: &#x27;ethusd&#x27;, &#x27;exchange&#x27;: &#x27;gemini&#x27;, &#x27;avg_execution_price&#x27;: &#x27;1788.64&#x27;, &#x27;side&#x27;: &#x27;sell&#x27;, &#x27;type&#x27;: &#x27;exchange limit&#x27;, &#x27;timestamp&#x27;: &#x27;1614044104&#x27;, &#x27;timestampms&#x27;: 1614044104693, &#x27;is_live&#x27;: False, &#x27;is_cancelled&#x27;: False, &#x27;is_hidden&#x27;: False, &#x27;was_forced&#x27;: False, &#x27;executed_amount&#x27;: &#x27;0.001&#x27;, &#x27;options&#x27;: [&#x27;immediate-or-cancel&#x27;], &#x27;price&#x27;: &#x27;778.64&#x27;, &#x27;original_amount&#x27;: &#x27;0.001&#x27;, &#x27;remaining_amount&#x27;: &#x27;0&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_ethusd_sell_functional.py::TestsEthUsdSell::test_immediate_or_cancel_cancel</td>
+          <td class="col-duration">1.20</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_ethusd_sell_functional.py::TestsEthUsdSell::test_fill_or_kill_fulfill</td>
+          <td class="col-duration">1.19</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_ethusd_sell_functional.py::TestsEthUsdSell::test_fill_or_kill_cancel</td>
+          <td class="col-duration">1.20</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_ethusd_sell_functional.py::TestsEthUsdSell::test_auction_only</td>
+          <td class="col-duration">1.19</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_ethusd_sell_functional.py::TestsEthUsdSell::test_indication_of_interest_fulfill</td>
+          <td class="col-duration">1.23</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;order_id&#x27;: &#x27;730477697&#x27;, &#x27;id&#x27;: &#x27;730477697&#x27;, &#x27;symbol&#x27;: &#x27;ethusd&#x27;, &#x27;exchange&#x27;: &#x27;gemini&#x27;, &#x27;avg_execution_price&#x27;: &#x27;0.00&#x27;, &#x27;side&#x27;: &#x27;sell&#x27;, &#x27;type&#x27;: &#x27;indication-of-interest limit&#x27;, &#x27;timestamp&#x27;: &#x27;1614044110&#x27;, &#x27;timestampms&#x27;: 1614044110684, &#x27;is_live&#x27;: True, &#x27;is_cancelled&#x27;: False, &#x27;is_hidden&#x27;: True, &#x27;was_forced&#x27;: False, &#x27;executed_amount&#x27;: &#x27;0&#x27;, &#x27;options&#x27;: [&#x27;indication-of-interest&#x27;], &#x27;price&#x27;: &#x27;1748.64&#x27;, &#x27;original_amount&#x27;: &#x27;100&#x27;, &#x27;remaining_amount&#x27;: &#x27;100&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_ethusd_sell_functional.py::TestsEthUsdSell::test_indication_of_interest_invalid_quantity</td>
+          <td class="col-duration">1.18</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;result&#x27;: &#x27;error&#x27;, &#x27;reason&#x27;: &#x27;InvalidQuantity&#x27;, &#x27;message&#x27;: &#x27;Invalid quantity for symbol ETHUSD: 4&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_ethusd_sell_functional.py::TestsEthUsdSell::test_indication_of_interest_invalid_price</td>
+          <td class="col-duration">1.24</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;result&#x27;: &#x27;error&#x27;, &#x27;reason&#x27;: &#x27;InvalidPrice&#x27;, &#x27;message&#x27;: &#x27;Invalid price for symbol ETHUSD: 4278.64&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_ethusd_sell_functional.py::TestsEthUsdSell::test_stop_limit_order</td>
+          <td class="col-duration">1.24</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>200
+{&#x27;order_id&#x27;: &#x27;730477894&#x27;, &#x27;id&#x27;: &#x27;730477894&#x27;, &#x27;symbol&#x27;: &#x27;ethusd&#x27;, &#x27;exchange&#x27;: &#x27;gemini&#x27;, &#x27;avg_execution_price&#x27;: &#x27;0.00&#x27;, &#x27;side&#x27;: &#x27;sell&#x27;, &#x27;type&#x27;: &#x27;stop-limit&#x27;, &#x27;timestamp&#x27;: &#x27;1614044114&#x27;, &#x27;timestampms&#x27;: 1614044114411, &#x27;is_live&#x27;: True, &#x27;is_cancelled&#x27;: False, &#x27;is_hidden&#x27;: False, &#x27;was_forced&#x27;: False, &#x27;executed_amount&#x27;: &#x27;0&#x27;, &#x27;options&#x27;: [], &#x27;stop_price&#x27;: &#x27;1751.64&#x27;, &#x27;price&#x27;: &#x27;1748.64&#x27;, &#x27;original_amount&#x27;: &#x27;0.1&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_ethusd_sell_functional.py::TestsEthUsdSell::test_negative_stop_limit_order</td>
+          <td class="col-duration">2.66</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_payload_negative.py::TestsTech::test_negative_payload_same_nonce</td>
+          <td class="col-duration">1.36</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;result&#x27;: &#x27;error&#x27;, &#x27;reason&#x27;: &#x27;InvalidNonce&#x27;, &#x27;message&#x27;: &quot;Nonce &#x27;1614044117000&#x27; has not increased since your last call to the Gemini API.&quot;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_payload_negative.py::TestsTech::test_negative_payload_invalid_request</td>
+          <td class="col-duration">1.18</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_payload_negative.py::TestsTech::test_negative_payload_empty_request</td>
+          <td class="col-duration">1.18</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_payload_negative.py::TestsTech::test_negative_payload_negative_amount</td>
+          <td class="col-duration">1.21</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_payload_negative.py::TestsTech::test_negative_payload_amount_0</td>
+          <td class="col-duration">1.27</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_payload_negative.py::TestsTech::test_negative_payload_negative_price</td>
+          <td class="col-duration">1.18</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_payload_negative.py::TestsTech::test_negative_payload_price_0</td>
+          <td class="col-duration">1.20</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_payload_negative.py::TestsTech::test_negative_payload_empty_nonce</td>
+          <td class="col-duration">1.19</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_payload_negative.py::TestsTech::test_negative_payload_empty_symbol</td>
+          <td class="col-duration">1.21</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_payload_negative.py::TestsTech::test_negative_payload_empty_amount</td>
+          <td class="col-duration">1.22</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_payload_negative.py::TestsTech::test_negative_payload_empty_price</td>
+          <td class="col-duration">1.18</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_payload_negative.py::TestsTech::test_negative_payload_empty_side</td>
+          <td class="col-duration">1.20</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_payload_negative.py::TestsTech::test_negative_payload_empty_type</td>
+          <td class="col-duration">1.19</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_payload_negative.py::TestsTech::test_negative_payload_invalid_options</td>
+          <td class="col-duration">1.24</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_payload_negative.py::TestsTech::test_negative_payload_two_options</td>
+          <td class="col-duration">1.18</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;result&#x27;: &#x27;error&#x27;, &#x27;reason&#x27;: &#x27;ConflictingOptions&#x27;, &#x27;message&#x27;: &quot;A single order supports at most one of these options: [&#x27;maker-or-cancel&#x27;, &#x27;immediate-or-cancel&#x27;, &#x27;auction-only&#x27;, &#x27;fill-or-kill&#x27;]&quot;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_zecusd_buy_functional.py::TestsZecUsdBuy::test_maker_or_cancel_fulfill</td>
+          <td class="col-duration">1.19</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_zecusd_buy_functional.py::TestsZecUsdBuy::test_maker_or_cancel_cancel</td>
+          <td class="col-duration">1.19</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_zecusd_buy_functional.py::TestsZecUsdBuy::test_immediate_or_cancel_fulfill</td>
+          <td class="col-duration">1.18</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_zecusd_buy_functional.py::TestsZecUsdBuy::test_immediate_or_cancel_cancel</td>
+          <td class="col-duration">1.20</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_zecusd_buy_functional.py::TestsZecUsdBuy::test_fill_or_kill_fulfill</td>
+          <td class="col-duration">1.19</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_zecusd_buy_functional.py::TestsZecUsdBuy::test_fill_or_kill_cancel</td>
+          <td class="col-duration">1.20</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_zecusd_buy_functional.py::TestsZecUsdBuy::test_auction_only</td>
+          <td class="col-duration">1.20</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_zecusd_buy_functional.py::TestsZecUsdBuy::test_indication_of_interest_fulfill</td>
+          <td class="col-duration">1.22</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_zecusd_buy_functional.py::TestsZecUsdBuy::test_indication_of_interest_invalid_quantity</td>
+          <td class="col-duration">1.20</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;result&#x27;: &#x27;error&#x27;, &#x27;reason&#x27;: &#x27;InvalidQuantity&#x27;, &#x27;message&#x27;: &#x27;Invalid quantity for symbol ZECUSD: 4&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_zecusd_buy_functional.py::TestsZecUsdBuy::test_indication_of_invalid_price</td>
+          <td class="col-duration">1.21</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;result&#x27;: &#x27;error&#x27;, &#x27;reason&#x27;: &#x27;InvalidPrice&#x27;, &#x27;message&#x27;: &#x27;Invalid price for symbol ZECUSD: 120.62&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_zecusd_buy_functional.py::TestsZecUsdBuy::test_stop_limit_order</td>
+          <td class="col-duration">1.18</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_zecusd_buy_functional.py::TestsZecUsdBuy::test_negative_stop_limit_order</td>
+          <td class="col-duration">8.38</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>400
+{&#x27;result&#x27;: &#x27;error&#x27;, &#x27;reason&#x27;: &#x27;InvalidStopPriceBuy&#x27;, &#x27;message&#x27;: &#x27;Stop Price: $145.62 must be lower than Price: $135.62 for Stop Limit buy Orders&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_zecusd_sell_functional.py::TestsZecUsdSell::test_maker_or_cancel_fulfill</td>
+          <td class="col-duration">1.20</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_zecusd_sell_functional.py::TestsZecUsdSell::test_maker_or_cancel_cancel</td>
+          <td class="col-duration">1.20</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_zecusd_sell_functional.py::TestsZecUsdSell::test_immediate_or_cancel_fulfill</td>
+          <td class="col-duration">1.18</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;order_id&#x27;: &#x27;730478303&#x27;, &#x27;id&#x27;: &#x27;730478303&#x27;, &#x27;symbol&#x27;: &#x27;zecusd&#x27;, &#x27;exchange&#x27;: &#x27;gemini&#x27;, &#x27;avg_execution_price&#x27;: &#x27;145.62&#x27;, &#x27;side&#x27;: &#x27;sell&#x27;, &#x27;type&#x27;: &#x27;exchange limit&#x27;, &#x27;timestamp&#x27;: &#x27;1614044160&#x27;, &#x27;timestampms&#x27;: 1614044160620, &#x27;is_live&#x27;: False, &#x27;is_cancelled&#x27;: False, &#x27;is_hidden&#x27;: False, &#x27;was_forced&#x27;: False, &#x27;executed_amount&#x27;: &#x27;0.001&#x27;, &#x27;options&#x27;: [&#x27;immediate-or-cancel&#x27;], &#x27;price&#x27;: &#x27;45.62&#x27;, &#x27;original_amount&#x27;: &#x27;0.001&#x27;, &#x27;remaining_amount&#x27;: &#x27;0&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_zecusd_sell_functional.py::TestsZecUsdSell::test_immediate_or_cancel_cancel</td>
+          <td class="col-duration">1.28</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_zecusd_sell_functional.py::TestsZecUsdSell::test_fill_or_kill_fulfill</td>
+          <td class="col-duration">1.21</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_zecusd_sell_functional.py::TestsZecUsdSell::test_fill_or_kill_cancel</td>
+          <td class="col-duration">1.20</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_zecusd_sell_functional.py::TestsZecUsdSell::test_auction_only</td>
+          <td class="col-duration">1.20</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_zecusd_sell_functional.py::TestsZecUsdSell::test_indication_of_interest_fulfill</td>
+          <td class="col-duration">1.23</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;order_id&#x27;: &#x27;730478328&#x27;, &#x27;id&#x27;: &#x27;730478328&#x27;, &#x27;symbol&#x27;: &#x27;zecusd&#x27;, &#x27;exchange&#x27;: &#x27;gemini&#x27;, &#x27;avg_execution_price&#x27;: &#x27;0.00&#x27;, &#x27;side&#x27;: &#x27;sell&#x27;, &#x27;type&#x27;: &#x27;indication-of-interest limit&#x27;, &#x27;timestamp&#x27;: &#x27;1614044166&#x27;, &#x27;timestampms&#x27;: 1614044166729, &#x27;is_live&#x27;: True, &#x27;is_cancelled&#x27;: False, &#x27;is_hidden&#x27;: True, &#x27;was_forced&#x27;: False, &#x27;executed_amount&#x27;: &#x27;0&#x27;, &#x27;options&#x27;: [&#x27;indication-of-interest&#x27;], &#x27;price&#x27;: &#x27;140.62&#x27;, &#x27;original_amount&#x27;: &#x27;500&#x27;, &#x27;remaining_amount&#x27;: &#x27;500&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_zecusd_sell_functional.py::TestsZecUsdSell::test_indication_of_interest_invalid_quantity</td>
+          <td class="col-duration">1.22</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;result&#x27;: &#x27;error&#x27;, &#x27;reason&#x27;: &#x27;InvalidQuantity&#x27;, &#x27;message&#x27;: &#x27;Invalid quantity for symbol ZECUSD: 4&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_zecusd_sell_functional.py::TestsZecUsdSell::test_indication_of_interest_invalid_price</td>
+          <td class="col-duration">1.21</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;result&#x27;: &#x27;error&#x27;, &#x27;reason&#x27;: &#x27;InvalidPrice&#x27;, &#x27;message&#x27;: &#x27;Invalid price for symbol ZECUSD: 170.62&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_zecusd_sell_functional.py::TestsZecUsdSell::test_stop_limit_order</td>
+          <td class="col-duration">1.20</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>200
+{&#x27;order_id&#x27;: &#x27;730478341&#x27;, &#x27;id&#x27;: &#x27;730478341&#x27;, &#x27;symbol&#x27;: &#x27;zecusd&#x27;, &#x27;exchange&#x27;: &#x27;gemini&#x27;, &#x27;avg_execution_price&#x27;: &#x27;0.00&#x27;, &#x27;side&#x27;: &#x27;sell&#x27;, &#x27;type&#x27;: &#x27;stop-limit&#x27;, &#x27;timestamp&#x27;: &#x27;1614044170&#x27;, &#x27;timestampms&#x27;: 1614044170416, &#x27;is_live&#x27;: True, &#x27;is_cancelled&#x27;: False, &#x27;is_hidden&#x27;: False, &#x27;was_forced&#x27;: False, &#x27;executed_amount&#x27;: &#x27;0&#x27;, &#x27;options&#x27;: [], &#x27;stop_price&#x27;: &#x27;118.62&#x27;, &#x27;price&#x27;: &#x27;115.62&#x27;, &#x27;original_amount&#x27;: &#x27;0.1&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_zecusd_sell_functional.py::TestsZecUsdSell::test_negative_stop_limit_order</td>
+          <td class="col-duration">1.22</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody></table></body></html>
